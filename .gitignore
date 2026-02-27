@@ -1,0 +1,3 @@
+/vendor/
+.env*
+.token_cache.json
