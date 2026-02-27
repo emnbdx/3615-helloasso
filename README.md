@@ -45,7 +45,3 @@ Pointez votre serveur web (Apache) vers la racine du projet. Le fichier `index.p
 - [HelloAsso PHP SDK](https://github.com/helloasso/helloasso-php) — Client API HelloAsso
 - [league/oauth2-client](https://github.com/thephpleague/oauth2-client) — OAuth2
 - [vlucas/phpdotenv](https://github.com/vlucas/phpdotenv) — Variables d'environnement
-
-## Licence
-
-MIT
