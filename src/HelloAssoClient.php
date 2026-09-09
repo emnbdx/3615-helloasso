@@ -6,6 +6,10 @@ use League\OAuth2\Client\Provider\GenericProvider;
 use OpenAPI\Client\Configuration;
 use OpenAPI\Client\Api\AnnuaireApi;
 use OpenAPI\Client\Api\FormulairesApi;
+use OpenAPI\Client\Api\CheckoutApi;
+use OpenAPI\Client\Model\HelloAssoApiV5CommonModelsCartsInitCheckoutBody;
+use OpenAPI\Client\Model\HelloAssoApiV5CommonModelsCartsCheckoutPayer;
+use OpenAPI\Client\Model\HelloAssoApiV5CommonModelsCartsCheckoutPaymentOptions;
 use OpenAPI\Client\Model\HelloAssoApiV5CommonModelsDirectoryListFormsRequest;
 use GuzzleHttp\Client;
 
@@ -188,12 +192,15 @@ class HelloAssoClient
                 }
             }
 
+            $startDate = $form->getStartDate();
+            $endDate = $form->getEndDate();
+
             return [
                 'title' => $form->getTitle() ?? '',
                 'description' => strip_tags($form->getDescription() ?? ''),
-                'startDate' => $form->getStartDate() ?? '',
-                'endDate' => $form->getEndDate() ?? '',
-                'formType' => $form->getFormType() ?? '',
+                'startDate' => $startDate instanceof \DateTimeInterface ? $startDate->format(DATE_ATOM) : ($startDate ?? ''),
+                'endDate' => $endDate instanceof \DateTimeInterface ? $endDate->format(DATE_ATOM) : ($endDate ?? ''),
+                'formType' => (string) ($form->getFormType() ?? ''),
                 'orgName' => $form->getOrganizationName() ?? '',
                 'url' => $form->getUrl() ?? '',
                 'place' => $place ? [
@@ -203,10 +210,44 @@ class HelloAssoClient
                     'zipCode' => $place->getZipCode() ?? '',
                 ] : null,
                 'tarifs' => $tarifs,
-                'state' => $form->getState() ?? '',
+                'state' => (string) ($form->getState() ?? ''),
             ];
         } catch (\Throwable $e) {
             return null;
+        }
+    }
+
+    public function createCheckout(
+        string $organizationSlug,
+        int $amountCents,
+        string $itemName,
+        string $returnUrl,
+        string $errorUrl,
+        string $backUrl,
+        ?array $payer = null
+    ): ?array {
+        try {
+            $api = new CheckoutApi(new Client(), $this->getConfig());
+            $payerModel = new HelloAssoApiV5CommonModelsCartsCheckoutPayer($payer ?? []);
+            $paymentOptions = new HelloAssoApiV5CommonModelsCartsCheckoutPaymentOptions(['enable_sepa' => false]);
+            $body = new HelloAssoApiV5CommonModelsCartsInitCheckoutBody([
+                'total_amount' => $amountCents,
+                'initial_amount' => $amountCents,
+                'item_name' => $itemName,
+                'return_url' => $returnUrl,
+                'error_url' => $errorUrl,
+                'back_url' => $backUrl,
+                'contains_donation' => true,
+                'payer' => $payerModel,
+                'payment_options' => $paymentOptions,
+            ]);
+            $response = $api->organizationsOrganizationSlugCheckoutIntentsPost($organizationSlug, $body);
+            return [
+                'id' => $response->getId(),
+                'redirect_url' => $response->getRedirectUrl(),
+            ];
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
         }
     }
 }

@@ -2,3 +2,4 @@ RewriteEngine On
 
 RewriteRule ^\.env$ - [R=404,L]
 RewriteRule ^\.token_cache\.json$ - [R=404,L]
+RewriteRule ^var/ - [R=404,L]

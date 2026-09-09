@@ -9,13 +9,18 @@ Recherchez des événements associatifs et consultez leurs détails, directement
 - **Recherche par nom** — Trouver un événement par mot-clé
 - **Événements aujourd'hui** — Découvrir les événements du jour dans une ville
 - **Fiche détaillée** — Dates, lieu, tarifs, organisateur
+- **Envoyer de l'argent** — Création d’un checkout HelloAsso, puis affichage d’un QR code en mosaïques Vidéotex (lisible sur Minitel physique).
 
 ## Prérequis
 
 - PHP 8.1+
 - Composer
-- Un compte développeur [HelloAsso](https://dev.helloasso.com/) (client_id / client_secret)
+- Un compte développeur [HelloAsso](https://dev.helloasso.com/) (client_id / client_secret) avec **autorisation Checkout**
 - Un serveur [MiniPavi](https://www.minipavi.fr/) ou un émulateur Minitel
+
+Pour la fonction « Envoyer de l’argent » :
+- Variable d’environnement `CALLBACK_BASE_URL` : URL publique de la racine du projet (callbacks HelloAsso + lien court du QR `go.php`).
+- Le dossier `var/checkouts/` doit être writable par PHP.
 
 ## Installation
 
@@ -33,6 +38,7 @@ API_URL=https://api.helloasso.com
 API_AUTH_URL=https://api.helloasso.com/oauth2/token
 CLIENT_ID=votre_client_id
 CLIENT_SECRET=votre_client_secret
+CALLBACK_BASE_URL=
 ```
 
 ## Déploiement

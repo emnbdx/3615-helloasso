@@ -4,6 +4,8 @@ require "vendor/autoload.php";
 use MiniPavi\MiniPaviCli;
 use Dotenv\Dotenv;
 use App\HelloAssoClient;
+use App\CheckoutLink;
+use App\VideotexQr;
 
 $dotenv = Dotenv::createImmutable(__DIR__);
 $dotenv->safeLoad();
@@ -73,6 +75,9 @@ function buildMenuPage()
     $vdt .= MiniPaviCli::setPos(1, 14);
     $vdt .= VDT_TXTWHITE . " " . VDT_FDINV . " 3 " . VDT_FDNORM . VDT_TXTCYAN . " A propos de HelloAsso";
 
+    $vdt .= MiniPaviCli::setPos(1, 17);
+    $vdt .= VDT_TXTWHITE . " " . VDT_FDINV . " 4 " . VDT_FDNORM . VDT_TXTCYAN . MiniPaviCli::toG2(" Envoyer de l'argent");
+
     return $vdt;
 }
 
@@ -99,12 +104,17 @@ function buildSearchPage()
 
 function formatDate($dateStr)
 {
-    if (empty($dateStr)) return '';
+    if ($dateStr instanceof \DateTimeInterface) {
+        return $dateStr->format('d/m/Y');
+    }
+    if ($dateStr === null || $dateStr === '') {
+        return '';
+    }
     try {
-        $dt = new \DateTime($dateStr);
+        $dt = new \DateTime((string) $dateStr);
         return $dt->format('d/m/Y');
     } catch (\Throwable $t) {
-        return mb_substr($dateStr, 0, 10);
+        return mb_substr((string) $dateStr, 0, 10);
     }
 }
 
@@ -244,6 +254,53 @@ function buildDetailPage($form)
     return $vdt;
 }
 
+function requestBaseUrl()
+{
+    if (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') {
+        $prot = 'https';
+    } elseif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+        $prot = 'https';
+    } elseif (!empty($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) !== 'off') {
+        $prot = 'https';
+    } elseif (isset($_SERVER['SERVER_PORT']) && intval($_SERVER['SERVER_PORT']) === 443) {
+        $prot = 'https';
+    } else {
+        $prot = 'http';
+    }
+    $path = str_replace('\\', '/', dirname($_SERVER['PHP_SELF'] ?? '/'));
+    if ($path === '/' || $path === '.') {
+        $path = '';
+    }
+    return rtrim($prot . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $path, '/');
+}
+
+function buildPayQrPage($shortUrl, $amountCents)
+{
+    $vdt = '';
+
+    $vdt .= VDT_BGBLUE . MiniPaviCli::repeatChar(' ', 40);
+    $vdt .= MiniPaviCli::setPos(1, 1);
+    $vdt .= VDT_BGBLUE . VDT_TXTWHITE . VDT_SZNORM;
+    $title = 'PAIEMENT';
+    if ($amountCents > 0) {
+        $title .= '  ' . number_format($amountCents / 100, 2, ',', ' ') . ' EUR';
+    }
+    $vdt .= MiniPaviCli::writeCentered(1, $title, VDT_BGBLUE . VDT_TXTWHITE);
+
+    $vdt .= VideotexQr::render($shortUrl, 1, 3, 40, 19);
+
+    $vdt .= MiniPaviCli::setPos(1, 23);
+    $vdt .= VDT_G0 . VDT_SZNORM . VDT_BGBLACK . VDT_TXTCYAN;
+    $vdt .= MiniPaviCli::writeCentered(23, "Scannez pour payer", VDT_TXTCYAN);
+
+    return $vdt;
+}
+
+function payQrInputCmd()
+{
+    return MiniPaviCli::createInputTxtCmd(40, 24, 1, MSK_SOMMAIRE | MSK_REPETITION | MSK_RETOUR | MSK_ENVOI, false, ' ', '');
+}
+
 function buildAboutPage()
 {
     $vdt = '';
@@ -362,9 +419,151 @@ try {
                     $step = 'about';
                     break;
                 }
+                if ($choix == '4') {
+                    $step = 'pay-slug';
+                    break;
+                }
                 $vdt = MiniPaviCli::writeLine0('Choix invalide!');
                 $step = 'menu';
                 break;
+
+            case 'pay-slug':
+                unset($context['checkout_id'], $context['checkout_url'], $context['pay_amount_cents'], $context['pay_qr_token'], $context['pay_short_url']);
+                $vdt = MiniPaviCli::clearScreen() . PRO_MIN . PRO_LOCALECHO_OFF;
+                $vdt .= MiniPaviCli::setPos(1, 2);
+                $vdt .= VDT_BGBLUE . MiniPaviCli::repeatChar(' ', 40);
+                $vdt .= MiniPaviCli::setPos(1, 3);
+                $vdt .= VDT_BGBLUE . VDT_TXTWHITE . VDT_SZDBLH;
+                $vdt .= MiniPaviCli::writeCentered(3, "ENVOYER DE L'ARGENT", VDT_BGBLUE . VDT_TXTWHITE . VDT_SZDBLH);
+                $vdt .= MiniPaviCli::setPos(1, 5);
+                $vdt .= VDT_BGBLUE . VDT_SZNORM . MiniPaviCli::repeatChar(' ', 40);
+                $vdt .= MiniPaviCli::setPos(1, 8);
+                $vdt .= VDT_SZNORM . VDT_BGBLACK . VDT_TXTCYAN;
+                $vdt .= MiniPaviCli::toG2(" Slug asso:");
+                $vdt .= MiniPaviCli::setPos(1, 10);
+                $vdt .= VDT_TXTWHITE . " > " . VDT_BGBLUE . MiniPaviCli::repeatChar('.', 35);
+                $vdt .= MiniPaviCli::setPos(1, 24);
+                $vdt .= VDT_G0 . VDT_SZNORM . VDT_TXTWHITE . VDT_BGBLACK;
+                $vdt .= " " . VDT_FDINV . " Envoi " . VDT_FDNORM . "  " . VDT_FDINV . " Sommaire " . VDT_FDNORM . VDT_CLRLN;
+                $cmd = MiniPaviCli::createInputTxtCmd(4, 10, 35, MSK_ENVOI | MSK_SOMMAIRE, true, '.', '');
+                $step = 'pay-slug-saisie';
+                $directCall = false;
+                break 2;
+
+            case 'pay-slug-saisie':
+                if (MiniPaviCli::$fctn == 'SOMMAIRE') {
+                    $step = 'menu';
+                    break;
+                }
+                $context['pay_slug'] = trim(@MiniPaviCli::$content[0] ?? '');
+                if (empty($context['pay_slug'])) {
+                    $vdt = MiniPaviCli::writeLine0('Slug requis!');
+                    $step = 'pay-slug';
+                    break;
+                }
+                $step = 'pay-amount';
+                break;
+
+            case 'pay-amount':
+                $line0 = $vdt;
+                $vdt = MiniPaviCli::clearScreen() . PRO_MIN . PRO_LOCALECHO_OFF;
+                $vdt .= MiniPaviCli::setPos(1, 2);
+                $vdt .= VDT_BGBLUE . MiniPaviCli::repeatChar(' ', 40);
+                $vdt .= MiniPaviCli::setPos(1, 3);
+                $vdt .= VDT_BGBLUE . VDT_TXTWHITE . VDT_SZDBLH;
+                $vdt .= MiniPaviCli::writeCentered(3, "MONTANT (euros)", VDT_BGBLUE . VDT_TXTWHITE . VDT_SZDBLH);
+                $vdt .= MiniPaviCli::setPos(1, 5);
+                $vdt .= VDT_BGBLUE . VDT_SZNORM . MiniPaviCli::repeatChar(' ', 40);
+                $vdt .= MiniPaviCli::setPos(1, 8);
+                $vdt .= VDT_SZNORM . VDT_BGBLACK . VDT_TXTCYAN;
+                $vdt .= MiniPaviCli::toG2(" Montant (ex: 10.50):");
+                $vdt .= MiniPaviCli::setPos(1, 10);
+                $vdt .= VDT_TXTWHITE . " > " . VDT_BGBLUE . MiniPaviCli::repeatChar('.', 35);
+                $vdt .= MiniPaviCli::setPos(1, 24);
+                $vdt .= VDT_G0 . VDT_SZNORM . VDT_TXTWHITE . VDT_BGBLACK;
+                $vdt .= " " . VDT_FDINV . " Envoi " . VDT_FDNORM . "  " . VDT_FDINV . " Sommaire " . VDT_FDNORM . VDT_CLRLN;
+                $vdt .= $line0;
+                $cmd = MiniPaviCli::createInputTxtCmd(4, 10, 35, MSK_ENVOI | MSK_SOMMAIRE, true, '.', '');
+                $step = 'pay-amount-saisie';
+                $directCall = false;
+                break 2;
+
+            case 'pay-amount-saisie':
+                if (MiniPaviCli::$fctn == 'SOMMAIRE') {
+                    $step = 'menu';
+                    break;
+                }
+                if (MiniPaviCli::$fctn != 'ENVOI') {
+                    break 2;
+                }
+                if (!empty($context['checkout_url'])) {
+                    $step = 'pay-qr';
+                    break;
+                }
+                $amountStr = str_replace(',', '.', trim(@MiniPaviCli::$content[0] ?? ''));
+                $amountEur = (float) $amountStr;
+                if ($amountEur <= 0) {
+                    $vdt = MiniPaviCli::writeLine0('Montant invalide!');
+                    $step = 'pay-amount';
+                    break;
+                }
+                $amountCents = (int) round($amountEur * 100);
+                $baseUrl = rtrim((string) ($_ENV['CALLBACK_BASE_URL'] ?? ''), '/');
+                if ($baseUrl === '') {
+                    $baseUrl = requestBaseUrl();
+                }
+                try {
+                    $client = new HelloAssoClient();
+                    $checkout = $client->createCheckout(
+                        $context['pay_slug'],
+                        $amountCents,
+                        'Don 3615 HelloAsso',
+                        $baseUrl . '/checkout-callback.php?outcome=success',
+                        $baseUrl . '/checkout-callback.php?outcome=error',
+                        $baseUrl . '/checkout-callback.php?outcome=back'
+                    );
+                } catch (\Throwable $e) {
+                    $checkout = ['error' => $e->getMessage()];
+                }
+                if (!$checkout || empty($checkout['redirect_url'])) {
+                    $err = $checkout['error'] ?? 'Erreur creation checkout!';
+                    $vdt = MiniPaviCli::writeLine0(mb_substr($err, 0, 39));
+                    $step = 'pay-amount';
+                    break;
+                }
+                $context['checkout_id'] = $checkout['id'];
+                $context['checkout_url'] = $checkout['redirect_url'];
+                $context['pay_amount_cents'] = $amountCents;
+                $context['pay_qr_token'] = CheckoutLink::store($checkout['redirect_url']);
+                $context['pay_short_url'] = CheckoutLink::url($baseUrl, $context['pay_qr_token']);
+                $step = 'pay-qr';
+                break;
+
+            case 'pay-qr':
+                $vdt = MiniPaviCli::clearScreen() . PRO_MIN . PRO_LOCALECHO_OFF;
+                $shortUrl = $context['pay_short_url'] ?? CheckoutLink::url(requestBaseUrl(), $context['pay_qr_token'] ?? '');
+                $vdt .= buildPayQrPage(
+                    $shortUrl,
+                    (int) ($context['pay_amount_cents'] ?? 0)
+                );
+                $vdt .= MiniPaviCli::setPos(1, 24);
+                $vdt .= VDT_G0 . VDT_SZNORM . VDT_TXTWHITE . VDT_BGBLACK;
+                $vdt .= " " . VDT_FDINV . " Sommaire " . VDT_FDNORM . " menu" . VDT_CLRLN;
+                $cmd = payQrInputCmd();
+                $step = 'pay-qr-saisie';
+                $directCall = false;
+                break 2;
+
+            case 'pay-qr-saisie':
+                if (MiniPaviCli::$fctn == 'SOMMAIRE' || MiniPaviCli::$fctn == 'RETOUR') {
+                    $step = 'menu';
+                    break;
+                }
+                if (MiniPaviCli::$fctn == 'REPETITION') {
+                    $step = 'pay-qr';
+                    break;
+                }
+                break 2;
 
             case 'search':
                 $vdt = MiniPaviCli::clearScreen() . PRO_MIN . PRO_LOCALECHO_OFF;
@@ -579,22 +778,16 @@ try {
                     break;
                 }
                 break 2;
+
+            default:
+                $vdt = MiniPaviCli::writeLine0('Etape inconnue');
+                $step = 'menu';
+                $directCall = false;
+                break;
         }
     }
 
-    if (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') {
-        $prot = 'https';
-    } elseif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
-        $prot = 'https';
-    } elseif (!empty($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) !== 'off') {
-        $prot = 'https';
-    } elseif (isset($_SERVER['SERVER_PORT']) && intval($_SERVER['SERVER_PORT']) === 443) {
-        $prot = 'https';
-    } else {
-        $prot = 'http';
-    }
-
-    $nextPage = $prot . "://" . $_SERVER['HTTP_HOST'] . "" . $_SERVER['PHP_SELF'];
+    $nextPage = requestBaseUrl() . '/' . basename($_SERVER['PHP_SELF'] ?? 'index.php');
     $context['step'] = $step;
     MiniPaviCli::send($vdt, $nextPage, serialize($context), true, $cmd, $directCall);
 } catch (Exception $e) {
